@@ -116,17 +116,16 @@ moduleFileName :: Options -> ModuleName -> FilePath
 moduleFileName opts name =
   optOutDir opts </> C.moduleNameToFileName (toTopLevelModuleName name) "hs"
 
-moduleSetup :: Options -> IsMain -> ModuleName -> filepath -> TCM (Recompile ModuleEnv ModuleRes)
-moduleSetup _ _ m _ = do
+moduleSetup :: ModuleName -> TCM ()
+moduleSetup m = do
   reportSDoc "agda2hs.compile" 3 $ text "Compiling module: " <+> prettyTCM m
   setScope . iInsideScope =<< curIF
-  return $ Recompile m
 
 ensureDirectory :: FilePath -> IO ()
 ensureDirectory = createDirectoryIfMissing True . takeDirectory
 
-writeModule :: Options -> ModuleEnv -> IsMain -> ModuleName -> [CompiledDef] -> TCM ModuleRes
-writeModule opts _ isMain m defs0 = do
+writeModule :: Options -> ModuleName -> [CompiledDef] -> TCM ()
+writeModule opts m defs0 = do
   code <- getForeignPragmas (optExtensions opts)
   let defs = concatMap defBlock defs0 ++ codeBlocks code
   let imps = imports code

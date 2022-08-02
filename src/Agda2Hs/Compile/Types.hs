@@ -3,20 +3,29 @@ module Agda2Hs.Compile.Types where
 import Control.Monad.Reader ( ReaderT )
 import Control.DeepSeq ( NFData(..) )
 
+import Data.Set ( Set )
+
 import qualified Language.Haskell.Exts.SrcLoc as Hs
 import qualified Language.Haskell.Exts.Syntax as Hs
 import qualified Language.Haskell.Exts.Extension as Hs
 import qualified Language.Haskell.Exts.Comments as Hs
 
-import Agda.Compiler.Backend ( Definition, QName, ModuleName, TCM )
+import Agda.Compiler.Backend ( Definition, IsMain, QName, ModuleName, TCM )
 import Agda.Syntax.Position ( Range )
+import Agda.Syntax.Scope.Base ( ScopeInfo )
 
-type ModuleEnv   = ModuleName
-type ModuleRes   = ()
+type ModuleEnv   = (ModuleName, ScopeInfo)
 type CompiledDef = [Ranged [Hs.Decl ()]]
 type Ranged a    = (Range, a)
 
 type Code = (Hs.Module Hs.SrcSpanInfo, [Hs.Comment])
+
+data ModuleRes = ModuleRes
+  { modIsMain      :: IsMain
+  , modImports     :: Set ModuleName
+  , modScope       :: ScopeInfo
+  , modDefinitions :: [Definition]
+  }
 
 data Options = Options { optOutDir     :: FilePath,
                          optExtensions :: [Hs.Extension] }
