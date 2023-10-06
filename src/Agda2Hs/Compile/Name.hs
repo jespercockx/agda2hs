@@ -105,6 +105,7 @@ compileQName f
     let skipModule = mod == currMod
                   || isJust mimpBuiltin
                   || prettyShow mod0 `elem` primMonadModules
+                  || prettyShow mod0 == "Prelude"
     qual <- if | skipModule -> return Unqualified
                | otherwise  -> getQualifier (fromMaybe f parent) mod
     -- we only calculate this when dealing with type operators; usually that's where 'type' prefixes are needed in imports
