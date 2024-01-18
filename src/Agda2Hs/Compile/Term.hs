@@ -54,6 +54,7 @@ isSpecialTerm q = case prettyShow q of
   "Haskell.Prim.Monad.Do.Monad._>>=_"           -> Just bind
   "Haskell.Prim.Monad.Do.Monad._>>_"            -> Just sequ
   "Haskell.Extra.Delay.runDelay"                -> Just $ const compileErasedApp
+  "Haskell.Extra.Delay.delayHasResult"          -> Just $ const compileErasedApp
   "Agda.Builtin.FromNat.Number.fromNat"         -> Just fromNat
   "Agda.Builtin.FromNeg.Negative.fromNeg"       -> Just fromNeg
   "Agda.Builtin.FromString.IsString.fromString" -> Just fromString

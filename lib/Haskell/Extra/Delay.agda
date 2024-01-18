@@ -1,69 +1,81 @@
-{-# OPTIONS --sized-types #-}
+{-# OPTIONS --guardedness #-}
 
 module Haskell.Extra.Delay where
 
-open import Agda.Builtin.Size public
 
 open import Haskell.Prelude
-open import Haskell.Prim.Thunk
 open import Haskell.Extra.Refinement
 
 private variable
   x y z : a
-  @0 i : Size
+  
+data Delay (a : Set) : Set
+record Delay′ (a : Set) : Set
 
-data Delay (a : Set) (@0 i : Size) : Set where
-  now : a → Delay a i
-  later : Thunk (Delay a) i → Delay a i
+data Delay a where
+  now : a → Delay a
+  later : Delay′ a → Delay a
 
-bindDelay : Delay a i → (a → Delay b i) → Delay b i
+record Delay′ a where
+  coinductive
+  field
+    force : Delay a
+open Delay′ public
+
+bindDelay : Delay a → (a → Delay b) → Delay b
 bindDelay (now x)   f = f x
 bindDelay (later x) f = later (λ where .force → bindDelay (x .force) f)
 
 {-# COMPILE AGDA2HS bindDelay inline #-}
 
 instance
-  iFunctorDelay : ∀ {i} → Functor (λ a → Delay a i)
-  iFunctorDelay {i} = record { DefaultFunctor iDefaultFunctorDelay }
+  iFunctorDelay : Functor (λ a → Delay a)
+  iFunctorDelay = record { DefaultFunctor iDefaultFunctorDelay }
     where
-      iDefaultFunctorDelay : DefaultFunctor (λ a → Delay a i)
+      iDefaultFunctorDelay : DefaultFunctor (λ a → Delay a)
       iDefaultFunctorDelay = λ where
         .DefaultFunctor.fmap → λ f mx → bindDelay mx (λ x → now (f x))
 
-  iApplicativeDelay : ∀ {i} → Applicative (λ a → Delay a i)
-  iApplicativeDelay {i} = record { DefaultApplicative iDefaultApplicativeDelay }
+  iApplicativeDelay : Applicative (λ a → Delay a)
+  iApplicativeDelay = record { DefaultApplicative iDefaultApplicativeDelay }
     where
-      iDefaultApplicativeDelay : DefaultApplicative (λ a → Delay a i)
+      iDefaultApplicativeDelay : DefaultApplicative (λ a → Delay a)
       iDefaultApplicativeDelay = λ where
         .DefaultApplicative.pure → now
         .DefaultApplicative._<*>_ → 
           λ mf mx → bindDelay mf (λ f → bindDelay mx (λ x → now (f x)))
 
-  iMonadDelay : ∀ {i} → Monad (λ a → Delay a i)
-  iMonadDelay {i} = record { DefaultMonad iDefaultMonadDelay }
+  iMonadDelay : Monad (λ a → Delay a)
+  iMonadDelay = record { DefaultMonad iDefaultMonadDelay }
     where
-      iDefaultMonadDelay : DefaultMonad (λ a → Delay a i)
+      iDefaultMonadDelay : DefaultMonad (λ a → Delay a)
       iDefaultMonadDelay = λ where
         .DefaultMonad._>>=_ → bindDelay
 
-data HasResult (x : a) : Delay a i → Set where
+-- tryDelay and unDelay cannot and should not be compiled to Haskell,
+-- so they are marked as erased.
+@0 tryDelay : (y : Delay a) → Nat → Maybe a
+tryDelay (now x)   _       = Just x
+tryDelay (later y) zero    = Nothing
+tryDelay (later y) (suc n) = tryDelay (y .force) n
+
+@0 unDelay : (y : Delay a) (n : Nat) → @0 {IsJust (tryDelay y n)} → a
+unDelay y n {p} = fromJust _ {p}
+
+data @0 HasResult (x : a) : Delay a → Set where
   now   : HasResult x (now x)
   later : HasResult x (y .force) → HasResult x (later y)
 
-runDelay : {@0 x : a} (y : Delay a ∞) → @0 HasResult x y → a
+runDelay : (y : Delay a) → @0 HasResult x y → a
 runDelay (now x) now = x
 runDelay (later y) (later p) = runDelay (y .force) p
 
-runDelaySound : {@0 x : a} (y : Delay a ∞) → (@0 hr : HasResult x y) → runDelay y hr ≡ x
-runDelaySound (now x) now = refl
-runDelaySound (later y) (later hr) = runDelaySound (y .force) hr
+-- `bindHasResult y f` should compile to `f y`
+bindHasResult : (y : Delay a) → ((∃ a λ x → HasResult x y) → Delay b) → Delay b
+bindHasResult (now x)   f = f (x ⟨ now ⟩)
+bindHasResult (later x) f = later λ where 
+  .force → bindHasResult (x .force) (f ∘ mapRefine later)
 
--- tryDelay and unDelay cannot and should not be compiled to Haskell,
--- so they are marked as erased.
-@0 tryDelay : (y : Delay a ∞) → Nat → Maybe (∃ a (λ x → HasResult x y))
-tryDelay (now x)   _       = Just (x ⟨ now ⟩)
-tryDelay (later y) zero    = Nothing
-tryDelay (later y) (suc n) = fmap (mapRefine later) (tryDelay (y .force) n)
-
-@0 unDelay : (y : Delay a ∞) (n : Nat) → @0 {IsJust (tryDelay y n)} → a
-unDelay y n {p} = fromJust (tryDelay y n) {p} .value
+-- `delayHasResult y` should compile to `y`
+delayHasResult : (y : Delay a) → Delay (∃ a λ x → HasResult x y)
+delayHasResult y = bindHasResult y return
