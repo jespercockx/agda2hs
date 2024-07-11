@@ -180,7 +180,7 @@ compileQName f
 
     mkImport mod qual par hf maybeIsType
       -- make sure the Prelude is properly qualified
-      | any (`isPrefixOf` pp mod) primModules
+      | isPrimModule (pp mod)
       = if isQualified qual then
           let mod' = hsModuleName "Prelude"
           in (mod', Just (Import mod' qual Nothing hf maybeIsType))
