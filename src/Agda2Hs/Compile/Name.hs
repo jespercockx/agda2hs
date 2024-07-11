@@ -192,7 +192,7 @@ hsTopLevelModuleName :: TopLevelModuleName -> Hs.ModuleName ()
 hsTopLevelModuleName = hsModuleName . intercalate "." . map unpack
                      . List1.toList . moduleNameParts
 
--- | Given a module name (assumed to be a toplevel module), 
+-- | Given a module name (assumed to be a toplevel module),
 -- compute the associated Haskell module name.
 compileModuleName :: ModuleName -> C (Hs.ModuleName ())
 compileModuleName m = do
@@ -201,3 +201,11 @@ compileModuleName m = do
     text "Top-level module name for" <+> prettyTCM m <+>
     text "is" <+> text (pp tlm)
   return tlm
+
+importInstance :: Term -> C ()
+importInstance (Def f _) = do
+  mod <- compileModuleName $ qnameModule f
+  unless (isPrimModule $ pp mod) $ do
+    reportSLn "agda2hs.import" 20 $ "Importing instances from " ++ pp mod
+    tellImport $ ImportInstances mod
+importInstance _ = return ()

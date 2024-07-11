@@ -2,6 +2,7 @@ module Agda2Hs.Compile.Term where
 
 import Control.Arrow ( (>>>), (&&&) )
 import Control.Monad ( unless )
+import Control.Monad.Except
 import Control.Monad.Reader
 
 import Data.Foldable ( toList )
@@ -19,6 +20,11 @@ import Agda.Syntax.Common
 import Agda.Syntax.Literal
 import Agda.Syntax.Internal
 
+import Agda.TypeChecking.CheckInternal ( infer )
+import Agda.TypeChecking.Constraints ( noConstraints )
+import Agda.TypeChecking.Conversion ( equalTerm )
+import Agda.TypeChecking.InstanceArguments ( findInstance )
+import Agda.TypeChecking.MetaVars ( newInstanceMeta )
 import Agda.TypeChecking.Monad
 import Agda.TypeChecking.Pretty
 import Agda.TypeChecking.Records ( shouldBeProjectible )
@@ -34,7 +40,7 @@ import Agda.Utils.Monad
 import Agda.Utils.Size
 
 import Agda2Hs.AgdaUtils
-import Agda2Hs.Compile.Name ( compileQName )
+import Agda2Hs.Compile.Name ( compileQName, importInstance )
 
 import Agda2Hs.Compile.Type ( compileType, compileDom, DomOutput(..) )
 import Agda2Hs.Compile.Types
@@ -543,3 +549,33 @@ compileLiteral (LitChar c)   = return $ Hs.charE c
 compileLiteral (LitString t) = return $ Hs.Lit () $ Hs.String () s s
   where s = Text.unpack t
 compileLiteral l             = genericDocError =<< text "bad term:" <?> prettyTCM (Lit l)
+
+checkInstance :: Term -> C ()
+checkInstance u | varOrDef u = do
+  liftTCM $ noConstraints $ do
+    reportSDoc "agda2hs.checkInstance" 12 $ text "checkInstance" <+> prettyTCM u
+    t <- infer u
+    reportSDoc "agda2hs.checkInstance" 15 $ text "  inferred type:" <+> prettyTCM t
+    (m, v) <- newInstanceMeta "" t
+    reportSDoc "agda2hs.checkInstance" 15 $ text "  instance meta:" <+> prettyTCM m
+    noConstraints $ findInstance m Nothing
+    reportSDoc "agda2hs.checkInstance" 15 $ text "  inferred instance:" <+> (prettyTCM =<< instantiate v)
+    reportSDoc "agda2hs.checkInstance" 65 $ text "  inferred instance:" <+> (pure . P.pretty =<< instantiate v)
+    reportSDoc "agda2hs.checkInstance" 65 $ text "  checking instance:" <+> (pure . P.pretty =<< instantiate u)
+    equalTerm t u v `catchError` \_ ->
+      genericDocError =<< text "illegal instance: " <+> prettyTCM u
+  importInstance u
+  where
+    varOrDef Var{} = True
+    varOrDef Def{} = True
+    varOrDef _     = False
+
+-- We need to compile applications of `fromNat`, `fromNeg`, and
+-- `fromString` where the constraint type is ⊤ or IsTrue .... Ideally
+-- this constraint would be marked as erased but this would involve
+-- changing Agda builtins.
+checkInstance u@(Con c _ _)
+  | prettyShow (conName c) == "Agda.Builtin.Unit.tt" ||
+    prettyShow (conName c) == "Haskell.Prim.IsTrue.itsTrue" ||
+    prettyShow (conName c) == "Haskell.Prim.IsFalse.itsFalse" = return ()
+checkInstance u = genericDocError =<< text "illegal instance: " <+> prettyTCM u
