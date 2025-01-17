@@ -96,7 +96,7 @@ lengthNat (_ ∷ xs) = addNat 1 (lengthNat xs)
 
 data ⊥ : Set where
 
-magic : {A : Set} → ⊥ → A
+magic : {A : Set} → @0 ⊥ → A
 magic ()
 
 --principle of explosion
