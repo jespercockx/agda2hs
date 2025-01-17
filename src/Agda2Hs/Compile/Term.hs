@@ -63,6 +63,7 @@ isSpecialDef q = case prettyShow q of
   "Haskell.Prim.if_then_else_"   -> Just ifThenElse
   "Haskell.Prim.case_of_"        -> Just caseOf
   "Haskell.Prim.the"             -> Just expTypeSig
+  "Haskell.Prim.Natural.predNat" -> Just expNatPred
   "Haskell.Extra.Delay.runDelay" -> Just compileErasedApp
   "Agda.Builtin.Word.primWord64FromNat" -> Just primWord64FromNat
   _                              -> Nothing
@@ -130,6 +131,14 @@ expTypeSig ty args@(_:typ:_:_) = do
     exp:args <- compileArgs ty args
     pure (Hs.ExpTypeSig () exp annot `eApp` args)
 expTypeSig _ _ = genericError "`the` must be fully applied"
+
+expNatPred :: DefCompileRule
+expNatPred ty args = compileArgs ty args >>= \case
+  n : _ -> return $ Hs.InfixApp () n op one
+  []    -> return $ Hs.RightSection () op one
+  where
+    op = Hs.QVarOp () $ Hs.UnQual () (Hs.Symbol () "-")
+    one = Hs.intE 1
 
 primWord64FromNat :: DefCompileRule
 primWord64FromNat ty args = compileArgs ty args >>= \case
