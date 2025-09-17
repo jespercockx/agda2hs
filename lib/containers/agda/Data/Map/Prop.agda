@@ -111,7 +111,7 @@ module _ {k a : Type} {{_ : Ord k}} where
   --
   prop-unionWith-sym {f} {ma} {mb} = prop-equality eq-key
     where
-      eq-key = λ key →
+      eq-key = λ (@ω key) →
         begin
           lookup key (unionWith f ma mb)
         ≡⟨ prop-lookup-unionWith key f _ _ ⟩
@@ -133,7 +133,7 @@ module _ {k a : Type} {{_ : Ord k}} where
       lem1 : intersection ma mb ≡ empty
       lem1 = prop-null→empty (intersection ma mb) cond
 
-      lem-disjoint = λ key →
+      lem-disjoint = λ (@ω key) →
         begin
           Maybe.disjoint (lookup key ma) (lookup key mb)
         ≡⟨⟩

@@ -85,7 +85,9 @@ compileInstance ToDefinition def@Defn{..} =
       reportSDoc "agda2hs.compile.instance" 25 $ text "compileInstance module: " <+> prettyTCM mod
       tel <- lookupSection mod
       addContext tel $ do
-        liftTCM $ setModuleCheckpoint mod
+        liftTCM $ do
+          cp <- viewTC eCurrentCheckpoint
+          setModuleCheckpoint mod cp
         pars <- getContextArgs
         ty <- defType `piApplyM` pars
         let clauses = funClauses `apply` pars
@@ -227,7 +229,9 @@ compileInstanceClause' curModule ty (p:ps) c
             Nothing -> agda2hsError "not allowed: absurd clause for superclass"
             Just b  -> return b
           addContext (clauseTel c) $ do
-            liftTCM $ setModuleCheckpoint curModule
+            liftTCM $ do
+              cp <- viewTC eCurrentCheckpoint
+              setModuleCheckpoint curModule cp
             checkInstance body
           reportSDoc "agda2hs.compile.instance" 20 $ vcat
             [ text "compileInstanceClause dropping clause"
